@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/joho/godotenv"
+	"github.com/liukaku/checkMetro/cmd/s3"
 )
 
 type MetroStop struct {
@@ -21,19 +21,14 @@ type MetroStop struct {
 }
 
 type Result struct {
-	Value        map[string]string 
+	ODataContext string      `json:"@odata.context"`
+	Value        []MetroStop `json:"value"`
 }
 
 func RequestHandler(ctx context.Context,) (*bool, error){
 // func RequestHandler() (*bool, error){
 	fmt.Println("Lambda started")
 	
-	err := godotenv.Load()
-
-	if err != nil {
-		handleError(err)
-	}
-
 	stopId := os.Getenv("STOP_ID")
 	apiUrl := os.Getenv("API_URL")
 	
@@ -105,12 +100,58 @@ func handleApiResponse(responseBody []byte) (string, error){
 	return dat.StationLocation, nil
 }
 
+func getStops() []byte {
+	apiKey := os.Getenv("API_KEY")
+	numberOfStops := "1000"
+	getUrl := fmt.Sprintf("https://api.tfgm.com/odata/Metrolinks?$top=%s", numberOfStops)
+
+	fmt.Println(getUrl)
+	fmt.Println(apiKey)
+	client := &http.Client{}
+	req, _ := http.NewRequest("GET", getUrl, nil)
+	req.Header.Set("Ocp-Apim-Subscription-Key", apiKey)
+	res, err := client.Do(req)
+	
+	if err != nil {
+		panic(err)
+	}
+	
+	fileOpen := res.Body
+
+	readFile, err := io.ReadAll(fileOpen)
+	if err != nil {
+		panic(err)
+	}
+
+	var fileStruct Result
+	
+	json.Unmarshal(readFile, &fileStruct)
+
+	backToJson, err := json.Marshal(fileStruct)
+	if err != nil {
+		panic(err)
+	}
+
+	os.WriteFile("stops.json", backToJson, 0644)
+	return backToJson
+
+}
+
 func handleError(err error) (error) {
 	fmt.Println(err)
 	return err
 }
 
 func main(){
-	lambda.Start(RequestHandler)
+	// lambda.Start(RequestHandler)
+	err := godotenv.Load()
+
+	if err != nil {
+		handleError(err)
+	}
+
+	s3.LoadConfig()
+	stopResults := getStops()
+	s3.SaveToBucket("metro-stops", stopResults)
 	// RequestHandler()
 }
