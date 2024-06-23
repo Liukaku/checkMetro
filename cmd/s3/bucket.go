@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -71,10 +72,27 @@ func LoadConfig() {
 
 }
 
-func SaveToBucket(bucketName string, stopsObject []byte){
+func GetFromBucket(bucketName string, keyName string) io.ReadCloser{
 	sdkConfig := loadDefaultSdkConfig()
 	s3Client := s3.NewFromConfig(sdkConfig)
-	createKey := "metrostops.json"
+	key := keyName
+
+	getResult, err := s3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: &bucketName,
+		Key: &key,
+	})
+
+	if err != nil {
+		panic(err)
+	}
+
+	return getResult.Body
+}
+
+func SaveToBucket(bucketName string, stopsObject []byte, keyName string){
+	sdkConfig := loadDefaultSdkConfig()
+	s3Client := s3.NewFromConfig(sdkConfig)
+	createKey := keyName
 
 	putResult, err := s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
 		Bucket: &bucketName,

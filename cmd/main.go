@@ -1,157 +1,99 @@
 package main
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
+	metro "github.com/liukaku/checkMetro/cmd/api"
 	"github.com/liukaku/checkMetro/cmd/s3"
+	structs "github.com/liukaku/checkMetro/cmd/util"
 )
-
-type MetroStop struct {
-	StationLocation string `json:"StationLocation"`
-	AtcoCode        string `json:"AtcoCode"`
-	Direction       string `json:"Direction"`
-	Dest0           string `json:"Dest0"`
-}
-
-type Result struct {
-	ODataContext string      `json:"@odata.context"`
-	Value        []MetroStop `json:"value"`
-}
-
-func RequestHandler(ctx context.Context,) (*bool, error){
-// func RequestHandler() (*bool, error){
-	fmt.Println("Lambda started")
-	
-	stopId := os.Getenv("STOP_ID")
-	apiUrl := os.Getenv("API_URL")
-	
-	apiResponse, err := apiRequest(stopId, apiUrl)
-	fmt.Println("fetched")
-
-	if err != nil {
-		handleError(err)
-	}
-
-	location, err := handleApiResponse(apiResponse)
-
-	fmt.Println(location)
-
-	if err != nil {
-		handleError(err)
-	}
-
-	success := false
-
-	if location == "Droylsden" {
-		success = true
-	}
-
-	fmt.Println(success)
-
-	return &success, nil
-}
-
-func apiRequest(stopId string, apiUrl string) ([]byte, error){
-	postBodyJson, _ := json.Marshal(map[string]string {
-		"stop": stopId,
-	})
-	
-	postBodyBuffer := bytes.NewBuffer(postBodyJson)
-	
-	fmt.Println("fetching")
-	response, err := http.Post(apiUrl, "application/json", postBodyBuffer)
-
-	if err != nil {
-
-		return []byte("frick"), err
-	}
-
-	defer response.Body.Close()
-
-	responseBody, err := io.ReadAll(response.Body)
-
-	if err != nil {
-		return []byte("frick"), err
-	}
-
-	return responseBody, nil
-}
-
-func handleApiResponse(responseBody []byte) (string, error){
-	var resString string
-	var dat MetroStop
-	// var apiErr map[string]interface{}
-
-	json.Unmarshal(responseBody, &resString)
-
-	err := json.Unmarshal([]byte(resString), &dat)
-
-	if err != nil {
-		return "error", err
-	} 
-	fmt.Println(dat)
-	return dat.StationLocation, nil
-}
-
-func getStops() []byte {
-	apiKey := os.Getenv("API_KEY")
-	numberOfStops := "1000"
-	getUrl := fmt.Sprintf("https://api.tfgm.com/odata/Metrolinks?$top=%s", numberOfStops)
-
-	fmt.Println(getUrl)
-	fmt.Println(apiKey)
-	client := &http.Client{}
-	req, _ := http.NewRequest("GET", getUrl, nil)
-	req.Header.Set("Ocp-Apim-Subscription-Key", apiKey)
-	res, err := client.Do(req)
-	
-	if err != nil {
-		panic(err)
-	}
-	
-	fileOpen := res.Body
-
-	readFile, err := io.ReadAll(fileOpen)
-	if err != nil {
-		panic(err)
-	}
-
-	var fileStruct Result
-	
-	json.Unmarshal(readFile, &fileStruct)
-
-	backToJson, err := json.Marshal(fileStruct)
-	if err != nil {
-		panic(err)
-	}
-
-	os.WriteFile("stops.json", backToJson, 0644)
-	return backToJson
-
-}
 
 func handleError(err error) (error) {
 	fmt.Println(err)
 	return err
 }
 
+func getStopFromArray(stops []structs.MetroStop, targetStop string)(structs.MetroStop, error){
+	fmt.Println(len(stops))
+
+	for i := 0; i < len(stops); i++ {
+		if stops[i].StationLocation == targetStop {
+			return stops[i], nil
+		}
+	}
+	return structs.MetroStop{}, errors.New("stop not found")
+}
+
+func getAndSaveNewTestStop(stops structs.Result, targetStop string){
+	stop, err := getStopFromArray(stops.Value, targetStop)
+
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(stop)
+
+	stopAsBytes, err := json.Marshal(stop)
+
+	if err != nil {
+		panic(err)
+	}
+
+	s3.SaveToBucket("metro-stops", stopAsBytes, "targetStop.json")
+}
+
+
 func main(){
-	// lambda.Start(RequestHandler)
 	err := godotenv.Load()
 
 	if err != nil {
 		handleError(err)
 	}
 
+	apiUrl := os.Getenv("API_URL")
+	metroUrl := os.Getenv("METRO_URL")
+
 	s3.LoadConfig()
-	stopResults := getStops()
-	s3.SaveToBucket("metro-stops", stopResults)
-	// RequestHandler()
+
+	// 1.fetch from s3
+	// 2.try that id
+	// 3.if true then return
+	// 4.else request new ID & save it
+
+	result := s3.GetFromBucket("metro-stops", "targetStop.json")
+	readFile, _ := io.ReadAll(result)
+
+	var fileToJson structs.MetroStop
+	
+	json.Unmarshal(readFile, &fileToJson)
+	
+	success, _ := metro.RequestHandler(strconv.Itoa(fileToJson.Id), apiUrl)
+
+	if *success {
+		fmt.Printf("success no need to get a new list")
+		return
+	}
+
+	// fetch stops return []bytes
+	stopResults := metro.GetStops(metroUrl)
+
+	// convert to json
+	var stopsJson structs.Result
+	json.Unmarshal(stopResults, &stopsJson)
+
+	// determine the new stop struct and save to s3 as individual
+	getAndSaveNewTestStop(stopsJson, "Droylsden")
+
+	// save the new whol response to s3
+	s3.SaveToBucket("metro-stops", stopResults, "metrostops.json")
+
+	fmt.Println("oh lawdy we updating")
+
+	return
 }
