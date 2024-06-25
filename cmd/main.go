@@ -58,6 +58,10 @@ func main(){
 
 	apiUrl := os.Getenv("API_URL")
 	metroUrl := os.Getenv("METRO_URL")
+	emailKey := os.Getenv("EMAIL_KEY")
+	emailTo := os.Getenv("EMAIL_TO")
+	emailFrom := os.Getenv("EMAIL_FROM")
+	postmanUrl := os.Getenv("POSTMAN_URL")
 
 	s3.LoadConfig()
 
@@ -77,6 +81,7 @@ func main(){
 
 	if *success {
 		fmt.Printf("success no need to get a new list")
+		metro.SendEmail(*success, emailKey, emailTo, emailFrom, postmanUrl)
 		return
 	}
 
