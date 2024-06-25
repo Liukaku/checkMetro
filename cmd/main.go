@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/joho/godotenv"
 	metro "github.com/liukaku/checkMetro/cmd/api"
 	"github.com/liukaku/checkMetro/cmd/s3"
@@ -48,8 +49,7 @@ func getAndSaveNewTestStop(stops structs.Result, targetStop string){
 	s3.SaveToBucket("metro-stops", stopAsBytes, "targetStop.json")
 }
 
-
-func main(){
+func handleRequest()(bool, error){
 	err := godotenv.Load()
 
 	if err != nil {
@@ -82,7 +82,7 @@ func main(){
 	if *success {
 		fmt.Printf("success no need to get a new list")
 		metro.SendEmail(*success, emailKey, emailTo, emailFrom, sparkUrl)
-		return
+		return true, nil
 	}
 
 	// fetch stops return []bytes
@@ -101,4 +101,10 @@ func main(){
 	fmt.Println("oh lawdy we updating")
 
 	metro.SendEmail(*success, emailKey, emailTo, emailFrom, sparkUrl)
+	return true, nil
+}
+
+
+func main() {
+	lambda.Start(handleRequest)
 }
