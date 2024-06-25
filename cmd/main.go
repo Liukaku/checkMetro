@@ -61,7 +61,7 @@ func main(){
 	emailKey := os.Getenv("EMAIL_KEY")
 	emailTo := os.Getenv("EMAIL_TO")
 	emailFrom := os.Getenv("EMAIL_FROM")
-	postmanUrl := os.Getenv("POSTMAN_URL")
+	sparkUrl := os.Getenv("SPARK_URL")
 
 	s3.LoadConfig()
 
@@ -81,7 +81,7 @@ func main(){
 
 	if *success {
 		fmt.Printf("success no need to get a new list")
-		metro.SendEmail(*success, emailKey, emailTo, emailFrom, postmanUrl)
+		metro.SendEmail(*success, emailKey, emailTo, emailFrom, sparkUrl)
 		return
 	}
 
@@ -100,5 +100,5 @@ func main(){
 
 	fmt.Println("oh lawdy we updating")
 
-	return
+	metro.SendEmail(*success, emailKey, emailTo, emailFrom, sparkUrl)
 }

@@ -32,11 +32,9 @@ func getRecipientInfo(emailTo string)[1]map[string]map[string]string{
 
 func getEmailContent(emailFrom string, subjectLine string, bodyContent string) structs.EmailContent{
 
-	emailFromMap := map[string]map[string]string {
-		"from": {
-			"email": emailFrom,
-			"name": "Metrolink Check",
-		},
+	emailFromMap := map[string]string {
+		"email": emailFrom,
+		"name": "Metrolink Check",
 	}
 
 	htmlBody := fmt.Sprintf(`
@@ -54,9 +52,9 @@ func getEmailContent(emailFrom string, subjectLine string, bodyContent string) s
 	return returnVal
 }
 
-func SendEmail(success bool, emailAuth string, emailTo string, emailFrom string, postmanUrl string) {
-	subjectLine := ternaryString(success, "Metrolink is running", "Metrolink stops need updating")
-	bodyContent := ternaryString(success, "hooray it works this week", "bugger")
+func SendEmail(success bool, emailAuth string, emailTo string, emailFrom string, sparkUrl string) {
+	subjectLine := ternaryString(success, "Metrolink was working", "Metrolink has been updated")
+	bodyContent := ternaryString(success, "hooray we didn't need to do anything", "bugger, we had to update the json")
 
 	recipients := getRecipientInfo(emailTo)
 	emailContent := getEmailContent(emailFrom, subjectLine, bodyContent)
@@ -67,11 +65,11 @@ func SendEmail(success bool, emailAuth string, emailTo string, emailFrom string,
 	
 	postBodyBuffer := bytes.NewBuffer(postBodyJson)
 
-
 	httpClient := &http.Client{}
-	req, _ := http.NewRequest("POST", postmanUrl, postBodyBuffer)
+	req, _ := http.NewRequest("POST", sparkUrl, postBodyBuffer)
 	req.Header.Set("Authorization", emailAuth)
 	req.Header.Set("Content-Type", "application/json")
+	fmt.Println(req.Header)
 	res, err := httpClient.Do(req)
 
 	if err != nil {

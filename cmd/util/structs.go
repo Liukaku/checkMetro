@@ -14,9 +14,9 @@ type Result struct {
 }
 
 type EmailContent struct {
-	From    map[string]map[string]string `json:"from"`
-	Subject string                       `json:"subject"`
-	Html    string                       `json:"html"`
+	From    map[string]string `json:"from"`
+	Subject string            `json:"subject"`
+	Html    string            `json:"html"`
 }
 
 type EmailBody struct {
