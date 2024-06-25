@@ -20,7 +20,7 @@ func ternaryString(boolean bool, string1 string, string2 string) string {
 //sorry future me for this type, should probably make a struct
 func getRecipientInfo(emailTo string)[1]map[string]map[string]string{
 	recipientsMap := map[string]map[string]string {
-		"address": map[string]string{
+		"address": {
 			"email": emailTo,
 		},
 	}
@@ -33,7 +33,7 @@ func getRecipientInfo(emailTo string)[1]map[string]map[string]string{
 func getEmailContent(emailFrom string, subjectLine string, bodyContent string) structs.EmailContent{
 
 	emailFromMap := map[string]map[string]string {
-		"from": map[string]string{
+		"from": {
 			"email": emailFrom,
 			"name": "Metrolink Check",
 		},
